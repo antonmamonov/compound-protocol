@@ -43,6 +43,7 @@ contract CEther is CToken {
      */
     function mint() external payable {
         (uint err,) = mintInternal(msg.value);
+        // emit Debug("mintErr",err);
         requireNoError(err, "mint failed");
     }
 

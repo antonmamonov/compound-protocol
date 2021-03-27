@@ -320,6 +320,8 @@ contract Comptroller is ComptrollerV5Storage, ComptrollerInterface, ComptrollerE
         }
     }
 
+    event Debug(string info, uint infoInt);
+
     /**
      * @notice Checks if the account should be allowed to borrow the underlying asset of the given market
      * @param cToken The market to verify the borrow against
@@ -353,22 +355,25 @@ contract Comptroller is ComptrollerV5Storage, ComptrollerInterface, ComptrollerE
             return uint(Error.PRICE_ERROR);
         }
 
-
         uint borrowCap = borrowCaps[cToken];
         // Borrow cap of 0 corresponds to unlimited borrowing
         if (borrowCap != 0) {
             uint totalBorrows = CToken(cToken).totalBorrows();
             uint nextTotalBorrows = add_(totalBorrows, borrowAmount);
-            require(nextTotalBorrows < borrowCap, "market borrow cap reached");
+            // require(nextTotalBorrows < borrowCap, "market borrow cap reached");
         }
 
         (Error err, , uint shortfall) = getHypotheticalAccountLiquidityInternal(borrower, CToken(cToken), 0, borrowAmount);
         if (err != Error.NO_ERROR) {
+            emit Debug("borrowAllowed-NonERROR",uint(err));
             return uint(err);
         }
         if (shortfall > 0) {
+            emit Debug("borrowAllowed-INSUFFICIENT_LIQUIDITY",shortfall);
             return uint(Error.INSUFFICIENT_LIQUIDITY);
         }
+
+        emit Debug("borrowAllowed_afterINSUFFICIENT_LIQUIDITY",0);
 
         // Keep the flywheel moving
         Exp memory borrowIndex = Exp({mantissa: CToken(cToken).borrowIndex()});

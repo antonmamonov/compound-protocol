@@ -461,6 +461,9 @@ contract CToken is CTokenInterface, Exponential, TokenErrorReporter {
         return uint(Error.NO_ERROR);
     }
 
+    event Debug(string info, uint infoInt);
+    event Debug123(string info, uint infoInt);
+
     /**
      * @notice Sender supplies assets into the market and receives cTokens in exchange
      * @dev Accrues interest whether or not the operation succeeds, unless reverted
@@ -718,6 +721,7 @@ contract CToken is CTokenInterface, Exponential, TokenErrorReporter {
             // accrueInterest emits logs on errors, but we still want to log the fact that an attempted borrow failed
             return fail(Error(error), FailureInfo.BORROW_ACCRUE_INTEREST_FAILED);
         }
+
         // borrowFresh emits borrow-specific logs on errors, so we don't need to
         return borrowFresh(msg.sender, borrowAmount);
     }
@@ -738,6 +742,7 @@ contract CToken is CTokenInterface, Exponential, TokenErrorReporter {
         /* Fail if borrow not allowed */
         uint allowed = comptroller.borrowAllowed(address(this), borrower, borrowAmount);
         if (allowed != 0) {
+            emit Debug("FAIL_borrowAllowed",0);
             return failOpaque(Error.COMPTROLLER_REJECTION, FailureInfo.BORROW_COMPTROLLER_REJECTION, allowed);
         }
 
@@ -776,7 +781,6 @@ contract CToken is CTokenInterface, Exponential, TokenErrorReporter {
         /////////////////////////
         // EFFECTS & INTERACTIONS
         // (No safe failures beyond this point)
-
         /*
          * We invoke doTransferOut for the borrower and the borrowAmount.
          *  Note: The cToken must handle variations between ERC-20 and ETH underlying.
