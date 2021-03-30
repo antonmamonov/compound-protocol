@@ -130,6 +130,8 @@ contract ComptrollerG6 is ComptrollerV5Storage, ComptrollerInterface, Comptrolle
         return results;
     }
 
+    event Debug(string info, uint infoInt);
+
     /**
      * @notice Add the market to the borrower's "assets in" for liquidity calculations
      * @param cToken The market to enter

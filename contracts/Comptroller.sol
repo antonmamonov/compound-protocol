@@ -867,6 +867,8 @@ contract Comptroller is ComptrollerV5Storage, ComptrollerInterface, ComptrollerE
 
         Exp memory newCollateralFactorExp = Exp({mantissa: newCollateralFactorMantissa});
 
+        // emit Debug("_setCollateralFactor", 0);
+
         // Check collateral factor <= 0.9
         Exp memory highLimit = Exp({mantissa: collateralFactorMaxMantissa});
         if (lessThanExp(highLimit, newCollateralFactorExp)) {
