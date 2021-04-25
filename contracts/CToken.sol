@@ -742,7 +742,7 @@ contract CToken is CTokenInterface, Exponential, TokenErrorReporter {
         /* Fail if borrow not allowed */
         uint allowed = comptroller.borrowAllowed(address(this), borrower, borrowAmount);
         if (allowed != 0) {
-            emit Debug("FAIL_borrowAllowed",0);
+            emit Debug("FAIL_borrowAllowed",allowed);
             return failOpaque(Error.COMPTROLLER_REJECTION, FailureInfo.BORROW_COMPTROLLER_REJECTION, allowed);
         }
 

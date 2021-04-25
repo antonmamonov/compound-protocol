@@ -363,17 +363,61 @@ contract Comptroller is ComptrollerV5Storage, ComptrollerInterface, ComptrollerE
             // require(nextTotalBorrows < borrowCap, "market borrow cap reached");
         }
 
+
+        // //DELETE ME AFTER
+        // AccountLiquidityLocalVars memory vars; // Holds all our calculation results
+        // uint oErr;
+
+        // // For each asset the account is in
+        // CToken[] memory assets = accountAssets[account];
+        // for (uint i = 0; i < assets.length; i++) {
+        //     CToken asset = CToken(cToken);
+
+        //     // Read the balances and exchange rate from the cToken
+        //     (oErr, vars.cTokenBalance, vars.borrowBalance, vars.exchangeRateMantissa) = asset.getAccountSnapshot(account);
+        //     if (oErr != 0) { // semi-opaque error code, we assume NO_ERROR == 0 is invariant between upgrades
+        //         return (Error.SNAPSHOT_ERROR, 0, 0);
+        //     }
+        //     vars.collateralFactor = Exp({mantissa: markets[address(asset)].collateralFactorMantissa});
+        //     vars.exchangeRate = Exp({mantissa: vars.exchangeRateMantissa});
+
+        //     // Get the normalized price of the asset
+        //     vars.oraclePriceMantissa = oracle.getUnderlyingPrice(asset);
+        //     if (vars.oraclePriceMantissa == 0) {
+        //         return (Error.PRICE_ERROR, 0, 0);
+        //     }
+        //     vars.oraclePrice = Exp({mantissa: vars.oraclePriceMantissa});
+
+        //     // Pre-compute a conversion factor from tokens -> ether (normalized price value)
+        //     vars.tokensToDenom = mul_(mul_(vars.collateralFactor, vars.exchangeRate), vars.oraclePrice);
+        //     // sumCollateral += tokensToDenom * cTokenBalance
+        //     vars.sumCollateral = mul_ScalarTruncateAddUInt(vars.tokensToDenom, vars.cTokenBalance, vars.sumCollateral);
+
+        //     // sumBorrowPlusEffects += oraclePrice * borrowBalance
+        //     vars.sumBorrowPlusEffects = mul_ScalarTruncateAddUInt(vars.oraclePrice, vars.borrowBalance, vars.sumBorrowPlusEffects);
+
+        //     // Calculate effects of interacting with cTokenModify
+        //     if (asset == cTokenModify) {
+        //         // redeem effect
+        //         // sumBorrowPlusEffects += tokensToDenom * redeemTokens
+        //         vars.sumBorrowPlusEffects = mul_ScalarTruncateAddUInt(vars.tokensToDenom, redeemTokens, vars.sumBorrowPlusEffects);
+
+        //         // borrow effect
+        //         // sumBorrowPlusEffects += oraclePrice * borrowAmount
+        //         vars.sumBorrowPlusEffects = mul_ScalarTruncateAddUInt(vars.oraclePrice, borrowAmount, vars.sumBorrowPlusEffects);
+        //     }
+        // }
+        // //////////////
+
         (Error err, , uint shortfall) = getHypotheticalAccountLiquidityInternal(borrower, CToken(cToken), 0, borrowAmount);
         if (err != Error.NO_ERROR) {
             emit Debug("borrowAllowed-NonERROR",uint(err));
             return uint(err);
         }
         if (shortfall > 0) {
-            emit Debug("borrowAllowed-INSUFFICIENT_LIQUIDITY",shortfall);
+            emit Debug("borrowAllowed-shortfall", shortfall);
             return uint(Error.INSUFFICIENT_LIQUIDITY);
         }
-
-        emit Debug("borrowAllowed_afterINSUFFICIENT_LIQUIDITY",0);
 
         // Keep the flywheel moving
         Exp memory borrowIndex = Exp({mantissa: CToken(cToken).borrowIndex()});
@@ -740,7 +784,6 @@ contract Comptroller is ComptrollerV5Storage, ComptrollerInterface, ComptrollerE
 
             // Pre-compute a conversion factor from tokens -> ether (normalized price value)
             vars.tokensToDenom = mul_(mul_(vars.collateralFactor, vars.exchangeRate), vars.oraclePrice);
-
             // sumCollateral += tokensToDenom * cTokenBalance
             vars.sumCollateral = mul_ScalarTruncateAddUInt(vars.tokensToDenom, vars.cTokenBalance, vars.sumCollateral);
 

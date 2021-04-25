@@ -17,8 +17,11 @@ const interestRateAbi = JSON.parse(fs.readFileSync('./contracts/build/WhitePaper
 
 (async function () {
   const ganacheAccounts = await web3.eth.getAccounts();
-  const myWalletAddress = ganacheAccounts[0];
-  const myWalletAddressBorrow = ganacheAccounts[1];
+  const myWalletAddress = ganacheAccounts[0]; // inital person that holds in some money
+  const myWalletAddress2 = ganacheAccounts[2]; // supplys after inital borrow
+  const myWalletAddressBorrow = ganacheAccounts[1]; // borrows
+  const myWalletAddressBorrow2 = ganacheAccounts[4]; // borrows 2
+  const myWalletAddressBorrow3 = ganacheAccounts[5]; // borrows 3
 
   //comptroller
   const comptrollerContract = new web3.eth.Contract(comptrollerAbi);
@@ -39,7 +42,7 @@ const interestRateAbi = JSON.parse(fs.readFileSync('./contracts/build/WhitePaper
   let interestRateContractAddress = "0x0ADF17Fecf6BDc662EE80529EF0951786337980a"
   const interestRateDeployment = await interestRateContract.deploy({
     data: interestRateBytecode.toString(),
-    arguments: [1e10, 1e10]
+    arguments: ["20000000000000000", "100000000000000000"]
   })
   .send({
     from: myWalletAddress,
@@ -56,7 +59,7 @@ const interestRateAbi = JSON.parse(fs.readFileSync('./contracts/build/WhitePaper
 
   const cEtherContractDeployment = await cEtherContract.deploy({
     data: cetherBytecode.toString(),
-    arguments: [comptrollerContractAddress, interestRateContractAddress, 1, "CEther","cETH",18,myWalletAddress] 
+    arguments: [comptrollerContractAddress, interestRateContractAddress, "200000000000000000000000000", "CEther","cETH",8,myWalletAddress] 
   })
   .send({
     from: myWalletAddress,
@@ -104,14 +107,14 @@ const interestRateAbi = JSON.parse(fs.readFileSync('./contracts/build/WhitePaper
   try{
     var txCollateralFactor = {from: myWalletAddress, gas: 9999999999999};
     const collateralFactorDeployment = await compContractDeployed.methods._setCollateralFactor(cEtherAddress,1e14).send(txCollateralFactor)
-    console.log("collateralFactorDeployment",collateralFactorDeployment)
+    // console.log("collateralFactorDeployment",collateralFactorDeployment)
   }catch(err){
     console.log("collateralFactorDeploymentErr",err)
   }
 
   const cEtherContractDeployed = new web3.eth.Contract(cetherAbi, cEtherAddress);
   const cTokenEvents1 = await cEtherContractDeployed.events.AccrueInterest({}, function(error, event){ 
-    console.log("AccrueInterest",event); 
+    console.log("AccrueInterest - interestAccumulated:",event.returnValues['interestAccumulated'],"\n"); 
   })
 
   const cTokenEvents2 = await cEtherContractDeployed.events.Debug({}, function(error, event){ 
@@ -124,7 +127,7 @@ const interestRateAbi = JSON.parse(fs.readFileSync('./contracts/build/WhitePaper
 
   for(var i = 0; i < 10; i ++){
     try{
-      var txMint = {from: myWalletAddress, value:Web3.utils.toWei('11', 'ether'), gas: 9999999999999};
+      var txMint = {from: myWalletAddress, value:Web3.utils.toWei('1000', 'ether'), gas: 9999999999999};
       const mintDeployment = await cEtherContractDeployed.methods.mint().send(txMint)
       // console.log("mintDeployment",mintDeployment)
     }catch(err){
@@ -140,49 +143,86 @@ const interestRateAbi = JSON.parse(fs.readFileSync('./contracts/build/WhitePaper
 
   // borrow wallet address now
 
-  try{
-    var txMint = {from: myWalletAddressBorrow, value:Web3.utils.toWei('1', 'ether'), gas: 9999999999999};
-    const mintDeployment = await cEtherContractDeployed.methods.mint().send(txMint)
-    // console.log("mintDeployment",mintDeployment)
-  }catch(err){
-    console.log("mintDeploymentErr",err)
-  }
-
-  try{
-    let markets = [cEtherAddress]; // This is the cToken contract(s) for your collateral
-    const enterMarketSend = {from: myWalletAddressBorrow, gas: 9999999999999}
-    const enterMarketDeployment = await compContractDeployed.methods.enterMarkets(markets).send(enterMarketSend)
-    console.log("enterMarketDeployment",enterMarketDeployment)
-  }catch(err){
-    console.log("enterMarketDeploymentErr",err)
-  }
-
-  console.log('Calculating your liquid assets in the protocol...');
-  let { 1:liquidity } = await compContractDeployed.methods.getAccountLiquidity(myWalletAddressBorrow).call();
-  liquidity = liquidity / 1e18;
-  console.log('liquidity',liquidity);
-
-  console.log('Fetching cETH collateral factor...');
-  let { 1:collateralFactor } = await compContractDeployed.methods.markets(cEtherAddress).call();
-  collateralFactor = (collateralFactor / 1e18) * 100; // Convert to percent
-  console.log('collateralFactor',collateralFactor);
-
-  try{
-    var txMint = {from: myWalletAddress, gas: 9999999999999};
-    const borrowDeployment = await cEtherContractDeployed.methods.borrow(Web3.utils.toWei('0.00001', 'ether')).send(txMint)
-    console.log("borrowDeployment",borrowDeployment)
-  }catch(err){
-    console.log("borrowDeploymentErr",err)
-  }
-
-  // back to supply address
-  for(var i = 0; i < 3; i ++){
+  /**
+   * 
+   * @param {String} borrowAddress - the address to borrow with
+   * @param {String} borrowAmountEther - the string amount in ether ie, ("1000") to mint first before borrowing
+   */
+  const mintAndBorrow = async (borrowAddress, borrowAmountEther) => {
+    console.log("mintAndBorrow - address:",borrowAddress)
     try{
-      var txMint = {from: myWalletAddress, value:Web3.utils.toWei('1', 'ether'), gas: 9999999999999};
+      var txMint = {from: borrowAddress, value:Web3.utils.toWei('1000', 'ether'), gas: 9999999999999};
       const mintDeployment = await cEtherContractDeployed.methods.mint().send(txMint)
       // console.log("mintDeployment",mintDeployment)
     }catch(err){
       console.log("mintDeploymentErr",err)
     }
+  
+    // const getAccountSnapshot = await cEtherContractDeployed.methods.getAccountSnapshot(borrowAddress).call()
+    // console.log("getAccountSnapshot", getAccountSnapshot)
+  
+    try{
+      let markets = [cEtherAddress]; // This is the cToken contract(s) for your collateral
+      const enterMarketSend = {from: borrowAddress, gas: 9999999999999}
+      const enterMarketDeployment = await compContractDeployed.methods.enterMarkets(markets).send(enterMarketSend)
+      // console.log("enterMarketDeployment",enterMarketDeployment)
+    }catch(err){
+      console.log("enterMarketDeploymentErr",err)
+    }
+  
+    console.log('Calculating your liquid assets in the protocol...');
+    const liquidityRaw = await compContractDeployed.methods.getAccountLiquidity(borrowAddress).call();
+    console.log('liquidityRaw',liquidityRaw["1"]);
+  
+    console.log('Fetching cETH collateral factor...');
+    let { 1:collateralFactor } = await compContractDeployed.methods.markets(cEtherAddress).call();
+    collateralFactor = (collateralFactor / 1e18) * 100; // Convert to percent
+    console.log('collateralFactor',collateralFactor);
+  
+    try{
+      var txMint = {from: myWalletAddress, gas: 9999999999999};
+      const borrowDeployment = await cEtherContractDeployed.methods.borrow(liquidityRaw["1"]).send(txMint)
+      console.log("borrowDeployment",borrowDeployment.events)
+    }catch(err){
+      console.log("borrowDeploymentErr",err)
+    }
   }
+
+  await mintAndBorrow(myWalletAddressBorrow)
+
+  // back to supply address - person 2
+
+  const ethBalance2BeforeMint = await web3.eth.getBalance(myWalletAddress2);
+  console.log("ethBalance2BeforeMint",ethBalance2BeforeMint)
+  const balance2BeforeMint = await cEtherContractDeployed.methods.balanceOf(myWalletAddress2).call()
+  console.log("balance2BeforeMint",balance2BeforeMint)
+
+  await mintAndBorrow(myWalletAddressBorrow2)
+  await mintAndBorrow(myWalletAddressBorrow2)
+
+  var txMint = {from: myWalletAddress2, value:Web3.utils.toWei('1000', 'ether'), gas: 9999999999999};
+  const mintDeployment = await cEtherContractDeployed.methods.mint().send(txMint)
+  // console.log("mintDeployment",mintDeployment)
+
+  const ethBalance2AfterMint = await web3.eth.getBalance(myWalletAddress2);
+  console.log("ethBalance2AfterMint",ethBalance2AfterMint)
+  const balance2AfterMint = await cEtherContractDeployed.methods.balanceOf(myWalletAddress2).call()
+  console.log("balance2AfterMint", balance2AfterMint)
+
+  await mintAndBorrow(myWalletAddressBorrow3)
+  await mintAndBorrow(myWalletAddressBorrow3)
+  await mintAndBorrow(myWalletAddressBorrow3)
+
+
+  console.log('Exchanging all cETH based on cToken amount...', '\n');
+  await cEtherContractDeployed.methods.redeem(balance2AfterMint).send({
+    from: myWalletAddress2,
+    gasLimit: web3.utils.toHex(500000),
+    gasPrice: web3.utils.toHex(1),
+  });
+
+  const ethBalance2AfterRedeem = await web3.eth.getBalance(myWalletAddress2);
+  console.log("ethBalance2AfterRedeem",ethBalance2AfterRedeem,"ethBalance2BeforeMint",ethBalance2BeforeMint,"delta",ethBalance2AfterRedeem  - ethBalance2BeforeMint)
+  const balance2AfterRedeem = await cEtherContractDeployed.methods.balanceOf(myWalletAddress2).call()
+  console.log("balance2AfterRedeem",balance2AfterRedeem,"balance2AfterMint",balance2AfterMint,"delta", balance2AfterRedeem - balance2AfterMint)
 })();
